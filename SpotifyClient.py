@@ -80,8 +80,8 @@ class SpotifyClient:
   def autorize_app(self, app: App, code, open_browser=False):
     if not os.path.exists('.cache') or open_browser:
       url = f'https://accounts.spotify.com/authorize?client_id={app.client_id}&scope=user-read-playback-state&response_type=code&redirect_uri=http://127.0.0.1:5000/callback'
-      print('Opening url in browser')
-      print('if not open, go to:', url)
+      print('Opening url in browser\n')
+      print(f'If not open, go to: {url}\n')
       webbrowser.get('firefox').open_new_tab(url)
       
       print('Aspetto il refresh token')
