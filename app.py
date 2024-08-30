@@ -1,8 +1,6 @@
+from flask import Flask, request, render_template
 from threading import Thread, Event
-from flask import Flask, request
 from main import main
-from ctypes import c_char_p
-import time
 
 sp = [None]
 
@@ -20,9 +18,9 @@ def callback():
   code[0] = request.args.get('code')
 
   if code[0]:
-    return 'App autorizzata con successo'
+    return render_template('callback.html', state='App autorizzata con successo', close='true')
   else:
-    return 'Errore nell\'autorizzazione dell\'app'
+    return render_template('callback.html', state='Errore nell\'autorizzazione dell\'app', close='false')
 
 @app.route('/resume')
 def resume():
@@ -59,8 +57,12 @@ def prev_track():
 @app.route('/set_volume/<percentage>')
 def set_volume(percentage):
   if ready.is_set():
-    sp[0].set_volume(percentage)
-    return 'ok'
+    try:
+      percentage = int(percentage)
+      
+      return 'ok' if sp[0].set_volume(percentage) else 'error'
+    except ValueError:
+      return 'invalid value for int'
   else:
     return 'Backend not ready'
 

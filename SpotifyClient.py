@@ -1,9 +1,9 @@
 from credentials import username, password
-from login import login
+from login2 import login
 import webbrowser
 import requests
 import base64
-import time
+import json
 import os
 
 class App:
@@ -36,16 +36,18 @@ class SpotifyClient:
     self.devices = None
   
   def _send_command(self, command):
-    from_id = self.get_playing_device()
-    to_id = from_id
-    endpoint = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
+    to_id = self.get_playing_device(True)
     
-    data = {
-      "command": {
-        "endpoint": command
+    for device in self.devices['devices']:
+      from_id = device['id']
+      url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
+      
+      data = {
+        "command": {
+          "endpoint": command
+        }
       }
-    }
-    self.s.post(endpoint, json=data, headers=self.player_headers)
+      self.s.post(url, json=data, headers=self.player_headers)
     
   def pause(self):
     self._send_command('pause')
@@ -59,25 +61,45 @@ class SpotifyClient:
   def prev_track(self):
     self._send_command('seek_to')
     
-  def set_volume(self, volume):
-    url = 'https://gew4-spclient.spotify.com/track-playback/v1/devices/0733d2ccb5a67b5be038642861d8b8a95c727655/volume'
+  def set_volume(self, value):
+    to_id = self.get_playing_device(True)
     
+    if self.devices:
+      for device in self.devices['devices']:
+        from_id = device['id']
+        url = f'https://gew4-spclient.spotify.com/connect-state/v1/connect/volume/from/{from_id}/to/{to_id}'
+        
+        data = {
+          'volume': round(value / 100.0 * 65535)
+        }
+        
+        self.s.put(url, json=data, headers=self.player_headers)
+        return True
+    return False
     
-  def autorize_app(self, app: App, code):
-    webbrowser.get('firefox').open_new_tab(f'https://accounts.spotify.com/authorize?client_id={app.client_id}&scope=user-read-playback-state&response_type=code&redirect_uri=http://127.0.0.1:5000/callback')
+  def autorize_app(self, app: App, code, open_browser=False):
+    if not os.path.exists('.cache') or open_browser:
+      url = f'https://accounts.spotify.com/authorize?client_id={app.client_id}&scope=user-read-playback-state&response_type=code&redirect_uri=http://127.0.0.1:5000/callback'
+      print('Opening url in browser')
+      print('if not open, go to:', url)
+      webbrowser.get('firefox').open_new_tab(url)
+      
+      print('Aspetto il refresh token')
+      # Aspetta che venga chiamata la callback a http://127.0.0.1:5000/callback
+      while not code[0]: pass
     
-    print('Aspetto il codice Basic')
-    # Aspetta che venga chiamata la callback a http://127.0.0.1:5000/callback
-    while not code[0]: pass
+      self.refresh_token = code[0]
+    else:
+      with open('.cache', 'r') as file:
+        print('Loading refresh token from .cache')
+        self.refresh_token = json.loads(file.read())['refresh_token']
     
-    self.basic_token = code[0]
+    print(f'Refresh token: "{self.refresh_token}"')
     
-    print(f'Basic token: "{self.basic_token}"')
-    
-    if self.basic_token:
+    if self.refresh_token:
       url = 'https://accounts.spotify.com/api/token'
       data = {
-        'code': self.basic_token,
+        'code': self.refresh_token,
         'redirect_uri': 'http://127.0.0.1:5000/callback',
         'grant_type': 'authorization_code'
       }
@@ -92,17 +114,27 @@ class SpotifyClient:
       
       if 'access_token' in r:
         self.player_Bearer_token = r['access_token']
+        with open('.cache', 'w') as file:
+          data = {
+            'access_token': self.player_Bearer_token, 'token_type': 'Bearer',
+            'refresh_token': self.refresh_token, 'scope': 'user-read-playback-state'
+          }
+          json.dump(data, file)
+          print(".cache saved")
+          
         print("Bearer devices token:", self.player_Bearer_token)
       else:
         print("Error: ", r)
+        if r['error'] == 'invalid_grant':
+          print('Trying with browser authentication')
+          self.autorize_app(app, code, open_browser=True)
     else:
       print("No Basic token")
   
   def get_playing_device(self, update_devices=False):
     if self.devices and not update_devices:
       if self.devices:
-        devices = self.devices['devices']
-        for device in devices:
+        for device in self.devices['devices']:
           if device['is_active']:
             return device['id']
       return None
