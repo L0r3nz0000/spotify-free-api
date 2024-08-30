@@ -8,3 +8,4 @@ def main(sp, code, ready):
   sp[0].autorize_app(my_app, code)
   
   ready.set()
+  print('Ready')
