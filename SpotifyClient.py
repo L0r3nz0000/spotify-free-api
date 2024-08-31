@@ -32,7 +32,7 @@ class SpotifyClient:
       'authorization': self.player_access_token
     }
     
-    self.player_Bearer_token = None
+    self.Bearer_token_1 = None
     self.devices = None
   
   def _send_command(self, command):
@@ -76,6 +76,13 @@ class SpotifyClient:
         self.s.put(url, json=data, headers=self.player_headers)
         return True
     return False
+  
+  def search(self, query):
+    if self.Bearer_token_1:
+      res = requests.get(f'https://api.spotify.com/v1/search?q={query}&type=artist,track,playlist,album', headers={'Authorization': 'Bearer ' + self.Bearer_token_1}).json()
+      return f"First track: {res['tracks']['items'][0]}\nFirst album: {res['albums']['items'][0]}\nFirst artist {res['artists']['items'][0]}\nFirst playlist {res['playlists']['items'][0]}"
+    else:
+      print('app not authenticated')
     
   def autorize_app(self, app: App, code, open_browser=False):
     if not os.path.exists('.cache') or open_browser:
@@ -113,16 +120,16 @@ class SpotifyClient:
       r = requests.post(url, data=data, headers=headers).json()
       
       if 'access_token' in r:
-        self.player_Bearer_token = r['access_token']
+        self.Bearer_token_1 = r['access_token']
         with open('.cache', 'w') as file:
           data = {
-            'access_token': self.player_Bearer_token, 'token_type': 'Bearer',
+            'access_token': self.Bearer_token_1, 'token_type': 'Bearer',
             'refresh_token': self.refresh_token, 'scope': 'user-read-playback-state'
           }
           json.dump(data, file)
           print(".cache saved")
           
-        print("Bearer devices token:", self.player_Bearer_token)
+        print("Bearer devices token:", self.Bearer_token_1)
       else:
         print("Error: ", r)
         if r['error'] == 'invalid_grant':
@@ -146,9 +153,9 @@ class SpotifyClient:
         return None
   
   def get_devices(self):
-    if self.player_Bearer_token:
+    if self.Bearer_token_1:
       headers = {
-        'Authorization': 'Bearer ' + self.player_Bearer_token
+        'Authorization': 'Bearer ' + self.Bearer_token_1
       }
       
       self.devices = requests.get("https://api.spotify.com/v1/me/player/devices", headers=headers).json()

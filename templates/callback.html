@@ -1,9 +1,13 @@
+<!DOCTYPE html>
 <html>
+  <head>
+    <script>
+      setTimeout(function() {
+        window.close();
+      }, 500);
+    
+    </script>
+  </head>
   <title>Done</title>
-  {{ state }}
-  <script type="text/javascript">
-    if ({{ close }}) {
-      window.close();
-    }
-  </script>
+  <h1>{{ state }}</h1>
 </html>

@@ -13,16 +13,16 @@ main_process.start()
 
 app = Flask(__name__)
 
-@app.route('/callback')
+@app.route('/callback', methods=['GET'])
 def callback():
   code[0] = request.args.get('code')
 
   if code[0]:
-    return render_template('callback.html', state='App autorizzata con successo', close='true')
+    return render_template('callback.html', state='App autorizzata con successo')
   else:
-    return render_template('callback.html', state='Errore nell\'autorizzazione dell\'app', close='false')
+    return render_template('callback.html', state='Errore nell\'autorizzazione dell\'app')
 
-@app.route('/resume')
+@app.route('/resume', methods=['POST'])
 def resume():
   if ready.is_set():
     sp[0].resume()
@@ -30,7 +30,7 @@ def resume():
   else:
     return 'Backend not ready'
 
-@app.route('/pause')
+@app.route('/pause', methods=['POST'])
 def pause():
   if ready.is_set():
     sp[0].pause()
@@ -38,7 +38,7 @@ def pause():
   else:
     return 'Backend not ready'
     
-@app.route('/next_track')
+@app.route('/next_track', methods=['POST'])
 def next_track():
   if ready.is_set():
     sp[0].next_track()
@@ -46,7 +46,7 @@ def next_track():
   else:
     return 'Backend not ready'
     
-@app.route('/prev_track')
+@app.route('/prev_track', methods=['POST'])
 def prev_track():
   if ready.is_set():
     sp[0].prev_track()
@@ -54,7 +54,11 @@ def prev_track():
   else:
     return 'Backend not ready'
 
-@app.route('/set_volume/<percentage>')
+@app.route('/search/<query>')
+def search(query):
+  return sp[0].search(query)
+
+@app.route('/set_volume/<percentage>', methods=['POST'])
 def set_volume(percentage):
   if ready.is_set():
     try:
