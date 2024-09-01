@@ -54,9 +54,41 @@ def prev_track():
   else:
     return 'Backend not ready'
 
-@app.route('/search/<query>')
-def search(query):
-  return sp[0].search(query)
+@app.route('/play_track/<query>', methods=['POST'])
+def play_track(query):
+  track = sp[0].search_track(query)
+  name = track['name']
+  uri = track['uri']
+  
+  sp[0].play_something(uri)
+  return name
+
+@app.route('/play_album/<query>', methods=['POST'])
+def play_album(query):
+  album = sp[0].search_album(query)
+  name = album['name']
+  uri = album['uri']
+  
+  sp[0].play_something(uri)
+  return name
+
+@app.route('/play_artist/<query>', methods=['POST'])
+def play_artist(query):
+  artist = sp[0].search_artist(query)
+  name = artist['name']
+  uri = artist['uri']
+  
+  sp[0].play_something(uri)
+  return name
+
+@app.route('/play_playlist/<query>', methods=['POST'])
+def play_playlist(query):
+  playlist = sp[0].search_playlist(query)
+  name = playlist['name']
+  uri = playlist['uri']
+  
+  sp[0].play_something(uri)
+  return name
 
 @app.route('/set_volume/<percentage>', methods=['POST'])
 def set_volume(percentage):

@@ -38,16 +38,17 @@ class SpotifyClient:
   def _send_command(self, command):
     to_id = self.get_playing_device(True)
     
-    for device in self.devices['devices']:
-      from_id = device['id']
-      url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
-      
-      data = {
-        "command": {
-          "endpoint": command
+    if self.devices:
+      for device in self.devices['devices']:
+        from_id = device['id']
+        url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
+        
+        data = {
+          "command": {
+            "endpoint": command
+          }
         }
-      }
-      self.s.post(url, json=data, headers=self.player_headers)
+        self.s.post(url, json=data, headers=self.player_headers)
     
   def pause(self):
     self._send_command('pause')
@@ -77,14 +78,72 @@ class SpotifyClient:
         return True
     return False
   
-  def search(self, query):
+  def _search(self, query: str, type: str):
     if self.Bearer_token_1:
-      res = requests.get(f'https://api.spotify.com/v1/search?q={query}&type=artist,track,playlist,album', headers={'Authorization': 'Bearer ' + self.Bearer_token_1}).json()
-      return f"First track: {res['tracks']['items'][0]}\nFirst album: {res['albums']['items'][0]}\nFirst artist {res['artists']['items'][0]}\nFirst playlist {res['playlists']['items'][0]}"
+      res = requests.get(f'https://api.spotify.com/v1/search?q={query}&type={type}&limit=10', headers={'Authorization': 'Bearer ' + self.Bearer_token_1}).json()
+      return res
     else:
       print('app not authenticated')
+  
+  def search_track(self, query: str):
+    return self._search(query, 'track')['tracks']['items'][0]
+  
+  def search_album(self, query: str):
+    return self._search(query, 'album')['albums']['items'][0]
+  
+  def search_artist(self, query: str):
+    return self._search(query, 'artist')['artists']['items'][0]
+  
+  def search_playlist(self, query: str):
+    return self._search(query, 'playlist')['playlists']['items'][0]
+  
+  def play_something(self, uri):
+    to_id = self.get_playing_device(True)
     
-  def autorize_app(self, app: App, code, open_browser=False):
+    if self.devices:
+      for device in self.devices['devices']:
+        from_id = device['id']
+        
+        url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
+        json = {
+          "command": {
+            "context": {
+              "url": f"context://{uri}"
+            },
+            "endpoint": "play"
+          }
+        }
+
+        self.s.post(url, json=json, headers=self.player_headers)
+  
+  def _request_access_token(self, app: App):
+    """Gets client credentials access token """
+    url = 'https://accounts.spotify.com/api/token'
+    
+    payload = {"grant_type": "client_credentials"}
+    
+    encoded = base64.b64encode(f'{app.client_id}:{app.client_secret}'.encode()).decode()
+    headers = {
+      'content-type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + encoded
+    }
+
+    print(f"sending POST request to {url} with Headers: {headers} and Body: {payload}")
+
+    try:
+      response = self.s.post(
+        url,
+        data=payload,
+        headers=headers,
+        verify=True
+      )
+      response.raise_for_status()
+      token_info = response.json()
+      return token_info
+    except:
+      return None
+    
+  def authorize_app(self, app: App, code, open_browser=False):
     if not os.path.exists('.cache') or open_browser:
       url = f'https://accounts.spotify.com/authorize?client_id={app.client_id}&scope=user-read-playback-state&response_type=code&redirect_uri=http://127.0.0.1:5000/callback'
       print('Opening url in browser\n')
@@ -97,30 +156,24 @@ class SpotifyClient:
     
       self.refresh_token = code[0]
     else:
-      with open('.cache', 'r') as file:
-        print('Loading refresh token from .cache')
-        self.refresh_token = json.loads(file.read())['refresh_token']
+      if os.path.exists('.cache'):
+        with open('.cache', 'r') as file:
+          print('Loading refresh token from .cache')
+          data = file.read()
+          if len(data):
+            print('loading .cache')
+            self.refresh_token = json.loads(data)['refresh_token']
+          else:
+            print('.cache empty')
+            self.authorize_app(app, code, True)
     
     print(f'Refresh token: "{self.refresh_token}"')
     
     if self.refresh_token:
-      url = 'https://accounts.spotify.com/api/token'
-      data = {
-        'code': self.refresh_token,
-        'redirect_uri': 'http://127.0.0.1:5000/callback',
-        'grant_type': 'authorization_code'
-      }
-      encoded = base64.b64encode(f'{app.client_id}:{app.client_secret}'.encode()).decode()
-
-      headers = {
-        'content-type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + encoded
-      }
+      token_info = self._request_access_token(app)
       
-      r = requests.post(url, data=data, headers=headers).json()
-      
-      if 'access_token' in r:
-        self.Bearer_token_1 = r['access_token']
+      if token_info:
+        self.Bearer_token_1 = token_info['access_token']
         with open('.cache', 'w') as file:
           data = {
             'access_token': self.Bearer_token_1, 'token_type': 'Bearer',
@@ -131,10 +184,10 @@ class SpotifyClient:
           
         print("Bearer devices token:", self.Bearer_token_1)
       else:
-        print("Error: ", r)
-        if r['error'] == 'invalid_grant':
+        print("Error: ", token_info)
+        if token_info['error'] == 'invalid_grant':
           print('Trying with browser authentication')
-          self.autorize_app(app, code, open_browser=True)
+          self.authorize_app(app, code, open_browser=True)
     else:
       print("No Basic token")
   

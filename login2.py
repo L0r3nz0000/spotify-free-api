@@ -3,13 +3,21 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
+import threading
 import pickle
 import time
 import json
 import os
 
-
 def login(username, password):
+  return_data = []
+  
+  threading.Thread(target=_login, args=(username, password, return_data)).start()
+  while return_data == []:
+    time.sleep(0.1)
+  return return_data
+
+def _login(username, password, return_data):
   success = False
   
   while not success:
@@ -64,9 +72,14 @@ def login(username, password):
 
     if success:
       print("Error.")
-      driver.close()
-      return None, None
+      #driver.close()
+      return_data.append(None)
+      return_data.append(None)
     else:
       print("Login successful.")
-      driver.close()
-      return f'Bearer {access_token}', client_id
+      #driver.close()
+      return_data.append(f'Bearer {access_token}')
+      return_data.append(client_id)
+    
+    # Mantiene aperta l'istanza del browser
+    while True: pass
