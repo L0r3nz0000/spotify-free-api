@@ -1,5 +1,6 @@
 from SpotifyClient import SpotifyClient, App
 from credentials import username, password
+import time
 
 def main(sp, code, ready):
   sp[0] = SpotifyClient(username, password)
@@ -9,3 +10,15 @@ def main(sp, code, ready):
   
   ready.set()
   print('Ready')
+  
+  while True:
+    devices = sp[0].update_devices()['devices']
+    
+    if devices:
+      for device in devices:
+        if device['is_active']:
+          print('> ' + device['name'])
+          sp[0].save_active_device(device['id'])
+        else:
+          print(device['name'])
+    time.sleep(2)

@@ -35,13 +35,14 @@ class SpotifyClient:
     self.Bearer_token_1 = None
     self.devices = None
   
+  # TODO: aggiungere un context alla richiesta quando non ci sono dispositivi attivi
   def _send_command(self, command):
-    to_id = self.get_playing_device(True)
+    active_device = self.get_playing_device(True)
     
-    if self.devices:
+    if self.devices and active_device:
       for device in self.devices['devices']:
         from_id = device['id']
-        url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
+        url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{active_device}'
         
         data = {
           "command": {
@@ -49,6 +50,8 @@ class SpotifyClient:
           }
         }
         self.s.post(url, json=data, headers=self.player_headers)
+    else:
+      print('no active device')
     
   def pause(self):
     self._send_command('pause')
@@ -63,20 +66,20 @@ class SpotifyClient:
     self._send_command('seek_to')
     
   def set_volume(self, value):
-    to_id = self.get_playing_device(True)
+    active_device = self.get_active_device_id()
     
-    if self.devices:
+    if self.devices and active_device:
       for device in self.devices['devices']:
         from_id = device['id']
-        url = f'https://gew4-spclient.spotify.com/connect-state/v1/connect/volume/from/{from_id}/to/{to_id}'
+        url = f'https://gew4-spclient.spotify.com/connect-state/v1/connect/volume/from/{from_id}/to/{active_device}'
         
         data = {
           'volume': round(value / 100.0 * 65535)
         }
         
         self.s.put(url, json=data, headers=self.player_headers)
-        return True
-    return False
+    else:
+      print('no active device')
   
   def _search(self, query: str, type: str):
     if self.Bearer_token_1:
@@ -98,13 +101,13 @@ class SpotifyClient:
     return self._search(query, 'playlist')['playlists']['items'][0]
   
   def play_something(self, uri):
-    to_id = self.get_playing_device(True)
+    active_device = self.get_active_device_id()
     
-    if self.devices:
+    if self.devices and active_device:
       for device in self.devices['devices']:
         from_id = device['id']
-        
-        url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{to_id}'
+      
+        url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{active_device}'
         json = {
           "command": {
             "context": {
@@ -115,17 +118,42 @@ class SpotifyClient:
         }
 
         self.s.post(url, json=json, headers=self.player_headers)
+    else:
+      print('no active device')
+  
+  def save_active_device(self, device_id: str):
+    # Se non esiste il file, lo crea
+    if not os.path.exists('active_devices.log'):
+      with open('active_devices.log', 'w') as f:
+        f.write('[]')
+    
+    # Carica il file 
+    with open('active_devices.log', 'r') as f:
+      devices = json.load(f)
+    
+    # Cerca il dispositivo e se non c'è lo aggiunge
+    if device_id not in devices:
+      devices.append(device_id)
+    
+    # Salva le modifiche al file
+    with open('active_devices.log', 'w') as f:
+      json.dump(devices, f)
   
   def _request_access_token(self, app: App):
     """Gets client credentials access token """
     url = 'https://accounts.spotify.com/api/token'
     
-    payload = {"grant_type": "client_credentials"}
+    auth_header = base64.b64encode(f'{app.client_id}:{app.client_secret}'.encode('ascii')).decode('ascii')
+
+    payload = {
+      'grant_type': 'authorization_code',
+      'code': self.refresh_token,
+      'redirect_uri': 'http://127.0.0.1:5000/callback'
+    }
     
-    encoded = base64.b64encode(f'{app.client_id}:{app.client_secret}'.encode()).decode()
     headers = {
-      'content-type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + encoded
+      'Authorization': f'Basic {auth_header}',
+      'Content-Type': 'application/x-www-form-urlencoded'
     }
 
     print(f"sending POST request to {url} with Headers: {headers} and Body: {payload}")
@@ -134,12 +162,11 @@ class SpotifyClient:
       response = self.s.post(
         url,
         data=payload,
-        headers=headers,
-        verify=True
+        headers=headers
       )
       response.raise_for_status()
-      token_info = response.json()
-      return token_info
+      token = response.json()
+      return token['access_token']
     except:
       return None
     
@@ -167,13 +194,15 @@ class SpotifyClient:
             print('.cache empty')
             self.authorize_app(app, code, True)
     
+    # Qui ho ottenuto il refresh_token
+    
     print(f'Refresh token: "{self.refresh_token}"')
     
     if self.refresh_token:
-      token_info = self._request_access_token(app)
+      self.Bearer_token_1 = self._request_access_token(app)
       
-      if token_info:
-        self.Bearer_token_1 = token_info['access_token']
+      if self.Bearer_token_1:
+        print("ho ottenuto con successo il token:",self.Bearer_token_1)
         with open('.cache', 'w') as file:
           data = {
             'access_token': self.Bearer_token_1, 'token_type': 'Bearer',
@@ -184,14 +213,12 @@ class SpotifyClient:
           
         print("Bearer devices token:", self.Bearer_token_1)
       else:
-        print("Error: ", token_info)
-        if token_info['error'] == 'invalid_grant':
-          print('Trying with browser authentication')
-          self.authorize_app(app, code, open_browser=True)
+        print("access_token None")
+        self.authorize_app(app, code, open_browser=True)
     else:
-      print("No Basic token")
+      print("No refresh token")
   
-  def get_playing_device(self, update_devices=False):
+  def get_playing_device(self, update_devices=False) -> str:
     if self.devices and not update_devices:
       if self.devices:
         for device in self.devices['devices']:
@@ -199,13 +226,13 @@ class SpotifyClient:
             return device['id']
       return None
     else:
-      if self.get_devices():
+      if self.update_devices():
         return self.get_playing_device(False)
       else:
         print("Errore nell'otterimento dei dispositivi")
         return None
   
-  def get_devices(self):
+  def update_devices(self):
     if self.Bearer_token_1:
       headers = {
         'Authorization': 'Bearer ' + self.Bearer_token_1
@@ -216,3 +243,43 @@ class SpotifyClient:
     else:
       print("Errore nell'otterimento dei dispositivi")
       return None
+  
+  def get_device_ids(self):
+    if self.devices:
+      return [device['id'] for device in self.devices['devices']]
+    else:
+      return None
+  
+  # Ritorna l'id del dispositivo attivo o dell'ultimo dispositivo disponibile che è stato attivato
+  def get_active_device_id(self):
+    active_device = self.get_playing_device(True)
+    
+    # Se non ci sono dispositivi attivi, attiva l'ultimo usato
+    if not active_device:
+      with open('active_devices.log', 'r') as f:
+        active_devices = json.load(f)
+      
+      if active_devices:
+        dev_found = False
+        
+        while not dev_found:
+          last_active_device = active_devices[-1]
+          
+          self.update_devices()
+          device_ids = self.get_device_ids()
+          
+          # Se il dispositivo esiste lo seleziona
+          if last_active_device in device_ids:
+            active_device = last_active_device
+            print(f'il dispositivo {last_active_device} esiste, provo ad attivarlo')
+            dev_found = True
+          else:
+            active_devices.pop(-1)
+
+        # Salva le modifiche al file
+        with open('active_devices.log', 'w') as f:
+          json.dump(active_devices, f)
+      else:
+        active_device = None
+    
+    return active_device
