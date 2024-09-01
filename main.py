@@ -17,8 +17,5 @@ def main(sp, code, ready):
     if devices:
       for device in devices:
         if device['is_active']:
-          print('> ' + device['name'])
           sp[0].save_active_device(device['id'])
-        else:
-          print(device['name'])
     time.sleep(2)

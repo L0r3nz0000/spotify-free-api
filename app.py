@@ -54,40 +54,56 @@ def prev_track():
   else:
     return 'Backend not ready'
 
-@app.route('/play_track/<query>', methods=['POST'])
+@app.route('/track/<query>', methods=['POST'])
 def play_track(query):
+  action = request.form.get('action')
   track = sp[0].search_track(query)
   name = track['name']
   uri = track['uri']
   
-  sp[0].play_something(uri)
+  if action == 'play':
+    sp[0].play_something(uri)
+  elif action == 'add_to_queue':
+    sp[0].add_to_queue(uri)
   return name
 
-@app.route('/play_album/<query>', methods=['POST'])
+@app.route('/album/<query>', methods=['POST'])
 def play_album(query):
+  action = request.form.get('action')
   album = sp[0].search_album(query)
   name = album['name']
   uri = album['uri']
   
-  sp[0].play_something(uri)
+  if action == 'play':
+    sp[0].play_something(uri)
+  elif action == 'add_to_queue':
+    sp[0].add_to_queue(uri)
   return name
 
-@app.route('/play_artist/<query>', methods=['POST'])
+@app.route('/artist/<query>', methods=['POST'])
 def play_artist(query):
+  action = request.form.get('action')
   artist = sp[0].search_artist(query)
   name = artist['name']
   uri = artist['uri']
   
-  sp[0].play_something(uri)
+  if action == 'play':
+    sp[0].play_something(uri)
+  elif action == 'add_to_queue':
+    sp[0].add_to_queue('spotify:track:' + uri)
   return name
 
-@app.route('/play_playlist/<query>', methods=['POST'])
+@app.route('/playlist/<query>', methods=['POST'])
 def play_playlist(query):
+  action = request.form.get('action')
   playlist = sp[0].search_playlist(query)
   name = playlist['name']
   uri = playlist['uri']
   
-  sp[0].play_something(uri)
+  if action == 'play':
+    sp[0].play_something(uri)
+  elif action == 'add_to_queue':
+    sp[0].add_to_queue(uri)
   return name
 
 @app.route('/set_volume/<percentage>', methods=['POST'])

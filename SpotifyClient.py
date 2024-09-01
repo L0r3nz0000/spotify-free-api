@@ -36,34 +36,36 @@ class SpotifyClient:
     self.devices = None
   
   # TODO: aggiungere un context alla richiesta quando non ci sono dispositivi attivi
-  def _send_command(self, command):
+  def _send_command(self, data):
     active_device = self.get_playing_device(True)
     
     if self.devices and active_device:
       for device in self.devices['devices']:
         from_id = device['id']
         url = f'https://gew4-spclient.spotify.com/connect-state/v1/player/command/from/{from_id}/to/{active_device}'
-        
-        data = {
-          "command": {
-            "endpoint": command
-          }
-        }
         self.s.post(url, json=data, headers=self.player_headers)
     else:
       print('no active device')
     
   def pause(self):
-    self._send_command('pause')
+    data = {"command": {"endpoint": 'pause'}}
+    self._send_command(data)
   
   def resume(self):
-    self._send_command('resume')
+    data = {"command": {"endpoint": 'resume'}}
+    self._send_command(data)
     
   def next_track(self):
-    self._send_command('skip_next')
+    data = {"command": {"endpoint": 'skip_next'}}
+    self._send_command(data)
   
   def prev_track(self):
-    self._send_command('seek_to')
+    data = {"command": {"endpoint": 'seek_to'}}
+    self._send_command(data)
+  
+  def add_to_queue(self, uri):
+    data = {'command': {'endpoint': 'add_to_queue', 'track': {'uri': uri}}}
+    self._send_command(data)
     
   def set_volume(self, value):
     active_device = self.get_active_device_id()
