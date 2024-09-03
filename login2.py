@@ -10,14 +10,6 @@ import json
 import os
 
 def login(username, password):
-  return_data = []
-  
-  threading.Thread(target=_login, args=(username, password, return_data)).start()
-  while return_data == []:
-    time.sleep(0.1)
-  return return_data
-
-def _login(username, password, return_data):
   success = False
   
   while not success:
@@ -73,13 +65,10 @@ def _login(username, password, return_data):
     if success:
       print("Error.")
       #driver.close()
-      return_data.append(None)
-      return_data.append(None)
+      return None, None
     else:
       print("Login successful.")
       #driver.close()
-      return_data.append(f'Bearer {access_token}')
-      return_data.append(client_id)
+      return f'Bearer {access_token}', client_id
     
-    # Mantiene aperta l'istanza del browser
-    while True: pass
+    

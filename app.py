@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template
 from threading import Thread, Event
-from main import main
+from main import redirect_stdout_to_file
 
 sp = [None]
 
@@ -8,8 +8,9 @@ ready = Event()
 
 code = [None]
 
-main_process = Thread(target=main, args=(sp, code, ready))
-main_process.start()
+# main_process = Thread(target=main, args=(sp, code, ready))
+# main_process.start()
+redirect_stdout_to_file("stdout.log", args=(sp, code, ready))
 
 app = Flask(__name__)
 
@@ -54,9 +55,10 @@ def prev_track():
   else:
     return 'Backend not ready'
 
-@app.route('/track/<query>', methods=['POST'])
-def play_track(query):
-  action = request.form.get('action')
+@app.route('/track', methods=['POST'])
+def play_track():
+  action = request.args.get('action')
+  query = request.args.get('query')
   track = sp[0].search_track(query)
   name = track['name']
   uri = track['uri']
@@ -64,12 +66,13 @@ def play_track(query):
   if action == 'play':
     sp[0].play_something(uri)
   elif action == 'add_to_queue':
-    sp[0].add_to_queue(uri)
+    sp[0].add_to_queue('spotify:track:' + uri)
   return name
 
-@app.route('/album/<query>', methods=['POST'])
-def play_album(query):
-  action = request.form.get('action')
+@app.route('/album', methods=['POST'])
+def play_album():
+  action = request.args.get('action')
+  query = request.args.get('query')
   album = sp[0].search_album(query)
   name = album['name']
   uri = album['uri']
@@ -77,12 +80,14 @@ def play_album(query):
   if action == 'play':
     sp[0].play_something(uri)
   elif action == 'add_to_queue':
-    sp[0].add_to_queue(uri)
+    sp[0].add_to_queue('spotify:album:' + uri)
   return name
 
-@app.route('/artist/<query>', methods=['POST'])
-def play_artist(query):
-  action = request.form.get('action')
+@app.route('/artist', methods=['POST'])
+def play_artist():
+  action = request.args.get('action')
+  query = request.args.get('query')
+  
   artist = sp[0].search_artist(query)
   name = artist['name']
   uri = artist['uri']
@@ -90,12 +95,13 @@ def play_artist(query):
   if action == 'play':
     sp[0].play_something(uri)
   elif action == 'add_to_queue':
-    sp[0].add_to_queue('spotify:track:' + uri)
-  return name
+    sp[0].add_to_queue('spotify:artist:' + uri)
+  return artist
 
-@app.route('/playlist/<query>', methods=['POST'])
-def play_playlist(query):
-  action = request.form.get('action')
+@app.route('/playlist', methods=['POST'])
+def play_playlist():
+  action = request.args.get('action')
+  query = request.args.get('query')
   playlist = sp[0].search_playlist(query)
   name = playlist['name']
   uri = playlist['uri']
@@ -103,7 +109,7 @@ def play_playlist(query):
   if action == 'play':
     sp[0].play_something(uri)
   elif action == 'add_to_queue':
-    sp[0].add_to_queue(uri)
+    sp[0].add_to_queue('spotify:playlist:' + uri)
   return name
 
 @app.route('/set_volume/<percentage>', methods=['POST'])

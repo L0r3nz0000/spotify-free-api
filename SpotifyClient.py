@@ -106,6 +106,7 @@ class SpotifyClient:
     active_device = self.get_active_device_id()
     
     if self.devices and active_device:
+      # TODO: interrompere il ciclo quando la richiesta riceve una risposta positiva (anche in set_volume)
       for device in self.devices['devices']:
         from_id = device['id']
       
@@ -123,7 +124,7 @@ class SpotifyClient:
     else:
       print('no active device')
   
-  def save_active_device(self, device_id: str):
+  def save_active_device(self, device):
     # Se non esiste il file, lo crea
     if not os.path.exists('active_devices.log'):
       with open('active_devices.log', 'w') as f:
@@ -131,11 +132,14 @@ class SpotifyClient:
     
     # Carica il file 
     with open('active_devices.log', 'r') as f:
-      devices = json.load(f)
-    
+      try:
+        devices = json.load(f)
+      except json.decoder.JSONDecodeError:
+        devices = []
+        
     # Cerca il dispositivo e se non c'è lo aggiunge
-    if device_id not in devices:
-      devices.append(device_id)
+    if device not in devices:
+      devices.append(device)
     
     # Salva le modifiche al file
     with open('active_devices.log', 'w') as f:
@@ -258,10 +262,14 @@ class SpotifyClient:
     
     # Se non ci sono dispositivi attivi, attiva l'ultimo usato
     if not active_device:
+      print('non ho trovato dispositivi attivi, cerco tra gli ultimi utilizzati')
       with open('active_devices.log', 'r') as f:
         active_devices = json.load(f)
+        # Rimuove i nomi dei dispositivi
+        active_devices = [device['id'] for device in active_devices]
       
       if active_devices:
+        print('ultimi dispositivi utilizzati: ', active_devices)
         dev_found = False
         
         while not dev_found:
@@ -276,12 +284,14 @@ class SpotifyClient:
             print(f'il dispositivo {last_active_device} esiste, provo ad attivarlo')
             dev_found = True
           else:
+            print(f'il dispositivo {last_active_device} non esiste, lo rimuovo')
             active_devices.pop(-1)
 
         # Salva le modifiche al file
         with open('active_devices.log', 'w') as f:
           json.dump(active_devices, f)
       else:
+        print('non ho trovato nessun dispositivo tra gli ultimi utilizzati')
         active_device = None
-    
+    print('sto riproducendo sul dispositivo', active_device)
     return active_device
