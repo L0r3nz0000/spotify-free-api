@@ -1,3 +1,4 @@
 credentials.py
 .env
 cookies.pkl
+__pycache__
